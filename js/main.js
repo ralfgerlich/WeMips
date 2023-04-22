@@ -41,8 +41,8 @@ $(document).ready(function(){
          */
         onFinish: function(){
             addToLog('success', "Emulation complete, returning to line 1");
-            me.setLine(1);
-            setHighlights({lineRan: lastLineNoRun, nextLine: me.getLineNumber()});
+            me.setNextLineToFetch(1);
+            setHighlights({lineRan: lastLineNoRun, nextLine: me.getNextLineToExecute()});
             running = false;
         },
         /*
@@ -110,8 +110,8 @@ $(document).ready(function(){
     // Keeps track of the next line we will run, we want to set it to the
     // first valid line.
     var nextMarker = editor.markText(
-        {line: me.getLineNumber()-1, ch: 0},
-        {line: me.getLineNumber(), ch: 0},
+        {line: me.getNextLineToExecute()-1, ch: 0},
+        {line: me.getNextLineToExecute(), ch: 0},
         {title: "Next line to be run", className: 'nextLine'}
     );
 
@@ -127,6 +127,7 @@ $(document).ready(function(){
     $("#optionShowRelative").change(switchAddressMode);
     $("#autoSwitch").change(function(e){autoSwitch = $(e.target).is(':checked');});
     $("#pseudoSwitch").change(function(e){me.setPseudoInstructionsEnabled($(e.target).is(':checked'));});
+    $("#pipelineSwitch").change(function(e){me.setPipelineEmulationEnabled($(e.target).is(':checked'));});
     $("#clearLog").on('click', function(){$("#log").html('')});
     $("#stackDisplayType").change(changeStackType);
     //$(".stackVal").on('blur', manualStackEdit); This has to be setup after the stack has been created
@@ -135,9 +136,9 @@ $(document).ready(function(){
     function setLine(){
         var newLine = $("#currentLineInput").val();
         // if(debug) console.log("Setting new line: "+ newLine);
-        if(!_.isNumber(me.setLine(Number(newLine)))) console.error("Error setting line: " + newLine);
-        // if(debug) console.log("nextLine"+ me.getLineNumber());
-        setHighlights({lineRan: null, nextLine: me.getLineNumber()})
+        if(!_.isNumber(me.setNextLineToFetch(Number(newLine)))) console.error("Error setting line: " + newLine);
+        // if(debug) console.log("nextLine"+ me.getNextLineToExecute());
+        setHighlights({lineRan: null, nextLine: me.getNextLineToExecute()})
         return false;
     };
     function markEditorAsInvalid(){
@@ -157,17 +158,13 @@ $(document).ready(function(){
         // if this code is no longer valid, reanalyze.
         if(!me.valid){
             try{
-                mipsAnalyze();
-                  mipsAnalyze(true);
-                  me.setLine(1);
-                  lastLineNoRun = null;
-                  setHighlights();
+                  mipsAnalyze();
             } catch(e){
                 addToLog('error', e.message, 1);
             }
         }
         try{
-            lastLineAttempted = me.getLineNumber();
+            lastLineAttempted = me.getNextLineToExecute();
             lineResult = me.step();
             if(lineResult){
                 setHighlights(lineResult);
@@ -178,7 +175,7 @@ $(document).ready(function(){
         } catch(e){
             addToLog('error', e.message, lastLineAttempted);
             running = false;
-            //me.setLine(lastLineAttempted + 1);
+            //me.setNextLineToFetch(lastLineAttempted + 1);
             //setHighlights();
         }
 
@@ -192,10 +189,7 @@ $(document).ready(function(){
         //newContent = newContent.replace(/\n\s+/g, '\n');
         editor.setValue(newContent);
 
-        mipsAnalyze(true);
-        me.setLine(1);
-        lastLineNoRun = null;
-        setHighlights();
+        mipsAnalyze();
     };
 
     function manualRegistryEdit(e){
@@ -233,7 +227,7 @@ $(document).ready(function(){
     function setHighlights(lines){
         lines = lines || {};
         lastLineNoRun = lines.lineRan || lastLineNoRun || null;
-        nextLine = lines.nextLine || me.getLineNumber();
+        nextLine = lines.nextLine || me.getNextLineToExecute();
         // if(debug) console.log("Active line: " + lastLineNoRun);
         // if(debug) console.log("Next line: " + nextLine);
         $("#currentLineInput").val(nextLine);
@@ -265,12 +259,7 @@ $(document).ready(function(){
     function run(){
         // if this code is no longer valid, reanalyze.
         if(!me.valid){
-            editor.save();
-            me.setCode($("#editor").val());
-            mipsAnalyze(true);
-            me.setLine(1);
-            lastLineNoRun = null;
-            setHighlights();
+            mipsAnalyze();
         }
         running = true;
         var lineRanThisRun = 0;
@@ -293,19 +282,13 @@ $(document).ready(function(){
         }
 
     };
-    function mipsAnalyze(goBackToLineOne){
+    function mipsAnalyze(){
         editor.save();
         linesOfCode = editor.lineCount();
         me.setCode($("#editor").val());
-        if(goBackToLineOne) me.setLine(1);
         me.valid = true;
-    };
-    function getCodeAsString(){
-        editor.save();
-        return $("#editor").val();
-    };
-    function unsignInt(num){
-        return (num << 31) >>> 0;
+        lastLineNoRun = null;
+        setHighlights();
     };
     function setSP(address){
         addStackAddress(address, '', false);
