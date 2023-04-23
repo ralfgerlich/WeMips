@@ -42,6 +42,45 @@ test("Lexer", function() {
     equal(token.type, Parser.TokenType.LogicalShiftRight);
 });
 
+
+test("Token Stream", function() {
+    let tokens = [
+        new Parser.Token(Parser.TokenType.Identifier),
+        new Parser.Token(Parser.TokenType.LParen),
+        new Parser.Token(Parser.TokenType.Number),
+        new Parser.Token(Parser.TokenType.RParen)
+    ];
+    let lexerIndex = 0;
+    let lexer = {
+        next: function() {
+            if (lexerIndex >= tokens.length) {
+                return new Parser.Token(Parser.TokenType.EndOfString);
+            } else {
+                return tokens[lexerIndex++];
+            }
+        }
+    };
+
+    let tokenStream = new Parser.TokenStream(lexer);
+
+    ok(tokenStream.checkNext(Parser.TokenType.Identifier));
+    tokenStream.consume();
+    ok(tokenStream.checkNext(Parser.TokenType.LParen));
+    tokenStream.pushCheckpoint();
+    tokenStream.consume();
+    ok(tokenStream.checkNext(Parser.TokenType.Number));
+    tokenStream.pushCheckpoint();
+    tokenStream.consume();
+    ok(tokenStream.checkNext(Parser.TokenType.RParen));
+    tokenStream.rewind();
+    ok(tokenStream.checkNext(Parser.TokenType.Number));
+    tokenStream.consume();
+    tokenStream.commit();
+    ok(tokenStream.checkNext(Parser.TokenType.RParen));
+    tokenStream.consume();
+    tokenStream.enforceCompletion();
+});
+
 test('Expression Parser', function() {
     let parseExpression = function(text, symbols) {
         let parser = Parser.exprParserFromString(text, symbols);
@@ -169,6 +208,7 @@ test('Instruction Parsing', function() {
 	ok(isValidLine("mylabel: ADD $t0, $t1, $t2 # comment here"), "we can have labels and comments.");
 
 	ok(isValidLine("loop:"), "we can have single line labels.");
+	ok(isValidLine("loop: loop2:"), "we can have multiple labels per line");
 	ok(isValidLine(" loop  :"), "A label can have whitespace between the text and the colon");
 	ok(!isValidLine("loop start:"), "A label cannot have more than one word");
 	ok(isValidLine("mylabel:ADD $t0, $t1, $t2"), "we can have attached labels.");
