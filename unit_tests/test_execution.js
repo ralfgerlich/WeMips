@@ -221,6 +221,94 @@ test("ADDIU", function() {
 	equal(ME.getRegisterUnsignedVal('$t0'), 2147483648, "Unsigned addition will not overflow.");
 });
 
+test('MULT', function() {
+	ME.setRegisterVal('$t0', 0x40000001);
+	ME.setRegisterVal('$t1', 0x40000000)
+	ME.runLines([
+		"MULT $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('hi'), 0x10000000);
+	equal(ME.getRegisterVal('lo'), 0x40000000);
+
+	ME.setRegisterVal('$t0', -0x40000001);
+	ME.setRegisterVal('$t1',  0x40000000)
+	ME.runLines([
+		"MULT $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('hi'), -0x10000001);
+	equal(ME.getRegisterVal('lo'), -0x40000000);
+});
+
+test('MULTU', function() {
+	ME.setRegisterVal('$t0', 0x40000001);
+	ME.setRegisterVal('$t1', 0x40000000)
+	ME.runLines([
+		"MULTU $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('hi'), 0x10000000);
+	equal(ME.getRegisterVal('lo'), 0x40000000);
+
+	ME.setRegisterVal('$t0', 0xBFFFFFFF);
+	ME.setRegisterVal('$t1', 0x40000000)
+	ME.runLines([
+		"MULTU $t0, $t1"
+	]);
+	equal(ME.getRegisterUnsignedVal('hi'), 0x2FFFFFFF);
+	equal(ME.getRegisterUnsignedVal('lo'), 0xC0000000);
+});
+
+test('DIV', function() {
+	ME.setRegisterVal('$t0', -0x80000000);
+	ME.setRegisterVal('$t1', 1)
+	ME.runLines([
+		"DIV $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('lo'), -0x80000000);
+	equal(ME.getRegisterVal('hi'), 0);
+
+	ME.setRegisterVal('$t0', 123);
+	ME.setRegisterVal('$t1', 21)
+	ME.runLines([
+		"DIV $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('lo'), 5);
+	equal(ME.getRegisterVal('hi'), 18);
+
+	ME.setRegisterVal('$t0', -123);
+	ME.setRegisterVal('$t1', 21)
+	ME.runLines([
+		"DIV $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('lo'), -5);
+	equal(ME.getRegisterVal('hi'), -18);
+
+	ME.setRegisterVal('$t0', 123);
+	ME.setRegisterVal('$t1', -21)
+	ME.runLines([
+		"DIV $t0, $t1"
+	]);
+	equal(ME.getRegisterVal('lo'), -5);
+	equal(ME.getRegisterVal('hi'), 18);
+});
+
+test('DIVU', function() {
+	ME.setRegisterVal('$t0', 0x80000000);
+	ME.setRegisterVal('$t1', 1)
+	ME.runLines([
+		"DIVU $t0, $t1"
+	]);
+	equal(ME.getRegisterUnsignedVal('lo'), 0x80000000);
+	equal(ME.getRegisterUnsignedVal('hi'), 0);
+
+	ME.setRegisterVal('$t0', 0x80000000);
+	ME.setRegisterVal('$t1', 21);
+	ME.runLines([
+		"DIVU $t0, $t1"
+	]);
+	equal(ME.getRegisterUnsignedVal('lo'), 102261126);
+	equal(ME.getRegisterUnsignedVal('hi'), 2);
+});
+
 test("LB, LBU, SB", function() {
 	var ME2 = new MipsEmulator({ baseStackAddress: MIPS.maxUnsignedValue(ME.BITS_PER_REGISTER - 1) }); // TODO: don't need the -1 here
 	equal(ME2.stack.pointerToBottomOfStack(), MIPS.maxUnsignedValue(ME.BITS_PER_REGISTER - 1), 'Ensure the stack is actually at the max value.');
@@ -1002,6 +1090,38 @@ test("BLTZAL", function() {
 			"tgt:"
 	]);
 	equal(ME.getRegisterVal('$ra'), 3);
+});
+
+test("MTHI", function() {
+	ME.setRegisterVal('lo', 222);
+	ME.setRegisterVal('hi', 222);
+	ME.setRegisterVal('$t0', 15);
+	ME.runLine("MTHI $t0");
+	equal(ME.getRegisterVal('hi'), 15);
+});
+
+test("MTLO", function() {
+	ME.setRegisterVal('lo', 222);
+	ME.setRegisterVal('hi', 222);
+	ME.setRegisterVal('$t0', 15);
+	ME.runLine("MTLO $t0");
+	equal(ME.getRegisterVal('lo'), 15);
+});
+
+test("MFHI", function() {
+	ME.setRegisterVal('lo', 222);
+	ME.setRegisterVal('hi', 223);
+	ME.setRegisterVal('$t0', 15);
+	ME.runLine("MFHI $t0");
+	equal(ME.getRegisterVal('$t0'), 223);
+});
+
+test("MFLO", function() {
+	ME.setRegisterVal('lo', 222);
+	ME.setRegisterVal('hi', 223);
+	ME.setRegisterVal('$t0', 15);
+	ME.runLine("MFLO $t0");
+	equal(ME.getRegisterVal('$t0'), 222);
 });
 
 test("LUI", function(){

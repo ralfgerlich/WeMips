@@ -84,6 +84,25 @@ Parser.parseRs = function(operandParser) {
     };
 };
 
+Parser.parseRd = function(operandParser) {
+    let rd = operandParser.parseRegister();
+
+    return {
+        '$rd': rd
+    };
+};
+
+Parser.parseRsRt = function (operandParser) {
+    let rs = operandParser.parseRegister();
+    operandParser.tokenStream.consume(Parser.TokenType.Comma);
+    let rt = operandParser.parseRegister();
+
+    return {
+        '$rs': rs,
+        '$rt': rt
+    };
+};
+
 Parser.parseRsRtLabel = function (operandParser) {
     let rs = operandParser.parseRegister();
     operandParser.tokenStream.consume(Parser.TokenType.Comma);
@@ -153,6 +172,10 @@ Parser.InstructionParsers = {
     'ADDIU': Parser.parseRtRsImmUnsigned,
     'SUB': Parser.parseRdRsRt,
     'SUBU': Parser.parseRdRsRt,
+    'MULT': Parser.parseRsRt,
+    'MULTU': Parser.parseRsRt,
+    'DIV': Parser.parseRsRt,
+    'DIVU': Parser.parseRsRt,
     /* Integer Comparison Instructions */
     'SLT': Parser.parseRdRsRt,
     'SLTU': Parser.parseRdRsRt,
@@ -199,6 +222,11 @@ Parser.InstructionParsers = {
     'BLTZ': Parser.parseRsLabel,
     'BLTZAL': Parser.parseRsLabel,
     'BLEZ': Parser.parseRsLabel,
+    /* Register transfer instructions */
+    'MFHI': Parser.parseRd,
+    'MFLO': Parser.parseRd,
+    'MTHI': Parser.parseRs,
+    'MTLO': Parser.parseRs,
     /* Load Instructions */
     'LB': Parser.parseRdAddr,
     'LBU': Parser.parseRdAddr,

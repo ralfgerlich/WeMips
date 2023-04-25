@@ -81,7 +81,8 @@ function MipsEmulator(mipsArgs){
         '$zero', '$at', '$v0', '$v1', '$a0', '$a1', '$a2', '$a3',
         '$t0',   '$t1', '$t2', '$t3', '$t4', '$t5', '$t6', '$t7',
         '$s0',   '$s1', '$s2', '$s3', '$s4', '$s5', '$s6', '$s7',
-        '$t8',   '$t9', '$k0', '$k1', '$gp', '$sp', '$fp', '$ra'
+        '$t8',   '$t9', '$k0', '$k1', '$gp', '$sp', '$fp', '$ra',
+        'hi', 'lo'
     ];
 
     var preservedRegs = [ // these are the registers that are preserved across function calls
@@ -202,8 +203,6 @@ function MipsEmulator(mipsArgs){
      * @return {Number}
      */
     this.getRegisterVal = function(reg) {
-        if(!reg)throw new Error("Register must be non empty");
-        if(reg.charAt(0) != '$') reg = '$'+reg;
         var regval = MIPS.unsignedNumberToSignedNumber(this.getRegister(reg).val, this.BITS_PER_REGISTER);
         if(debug) console.log("Getting signed register value: " + regval );
         return regval;
@@ -215,8 +214,7 @@ function MipsEmulator(mipsArgs){
      * @return {Number}
      */
     this.getRegisterUnsignedVal = function(reg) {
-        if(reg.charAt(0) != '$') reg = '$'+reg;
-        var regval = MIPS.signedNumberToUnsignedNumber(this.getRegisterVal(reg), this.BITS_PER_REGISTER);
+        var regval = MIPS.signedNumberToUnsignedNumber(this.getRegister(reg).val, this.BITS_PER_REGISTER);
         if(debug) console.log("Getting unsigned register value: " + regval);
         return regval;
     },
@@ -227,18 +225,23 @@ function MipsEmulator(mipsArgs){
      * @return {Object} register object.
      */
     this.getRegister = function(reg) {
-        if(reg.charAt(0) != '$') reg = '$'+reg;
-        if(!this.isValidRegister(reg)) throw new RegisterError('Non existant register: {0}'.format(reg));
+        if(!reg)throw new Error("Register must be non empty");
+        if (!(reg in registers)) {
+            throw new RegisterError('Non existant register: {0}'.format(reg));
+        }
         return registers[reg];
     },
     /**
-     * Checks if a register exists
+     * Checks if a register exists and can be directly addressed.
+     * 
+     * Directly addressable registers are those registers that start with '$'.
+     * 
      * @member mipsEmulator
      * @param  {String}  reg Name of a register ex: '$ra'
      * @return {Boolean}
      */
     this.isValidRegister = function(reg) {
-        return typeof registers[reg] !== "undefined";
+        return (reg.charAt(0)=='$' && typeof registers[reg] !== "undefined");
     },
     /**
      * checks if a register is writable
@@ -257,7 +260,6 @@ function MipsEmulator(mipsArgs){
      */
     this.setRegisterVal = function(reg, value, enableCallback) {
         if(debug) console.log("Setting register " + reg + " to " + value);
-        if(reg.charAt(0) != '$') reg = '$'+reg; // TODO: I think we should enforce that the reg always has the $ symbol
         var minRegisterValue = MIPS.minSignedValue(this.BITS_PER_REGISTER);
         var maxRegisterValue = MIPS.maxUnsignedValue(this.BITS_PER_REGISTER);
         if (value < minRegisterValue || maxRegisterValue < value) {
@@ -265,7 +267,6 @@ function MipsEmulator(mipsArgs){
         }
 
         enableCallback = enableCallback || true;
-        assert(reg[0] === '$');
 
 
         var register = registers[reg];

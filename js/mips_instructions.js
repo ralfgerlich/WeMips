@@ -33,6 +33,46 @@ function mipsInstructionExecutor(ME) {
                 ME.setRegisterVal(namedArgs.$rd, unsignedAddition(ME.getRegisterUnsignedVal(namedArgs.$rs), -ME.getRegisterUnsignedVal(namedArgs.$rt)));
             }
         },
+        'MULT': {
+            runMethod: function(namedArgs) {
+                let multResult = multiplication(
+                    ME.getRegisterVal(namedArgs.$rs),
+                    ME.getRegisterVal(namedArgs.$rt)
+                );
+                ME.setRegisterVal('hi', multResult.hi);
+                ME.setRegisterVal('lo', multResult.lo);
+            }
+        },
+        'MULTU': {
+            runMethod: function(namedArgs) {
+                let multResult = multiplication(
+                    ME.getRegisterUnsignedVal(namedArgs.$rs),
+                    ME.getRegisterUnsignedVal(namedArgs.$rt)
+                );
+                ME.setRegisterVal('hi', multResult.hi);
+                ME.setRegisterVal('lo', multResult.lo);
+            }
+        },
+        'DIV': {
+            runMethod: function(namedArgs) {
+                let dividend = ME.getRegisterVal(namedArgs.$rs);
+                let divisor = ME.getRegisterVal(namedArgs.$rt);
+                var quotient = Math.trunc(dividend / divisor);
+                let remainder = dividend - divisor * quotient;
+                ME.setRegisterVal('lo', quotient);
+                ME.setRegisterVal('hi', remainder);
+            }
+        },
+        'DIVU': {
+            runMethod: function(namedArgs) {
+                let dividend = ME.getRegisterUnsignedVal(namedArgs.$rs);
+                let divisor = ME.getRegisterUnsignedVal(namedArgs.$rt);
+                let quotient = Math.trunc(dividend / divisor);
+                let remainder = dividend - divisor * quotient;
+                ME.setRegisterVal('lo', quotient);
+                ME.setRegisterVal('hi', remainder);
+            }
+        },
         'LUI': {
             runMethod: function(namedArgs){
                 ME.setRegisterVal(namedArgs.$rd, (namedArgs.imm << 16));
@@ -276,6 +316,29 @@ function mipsInstructionExecutor(ME) {
             }
         },
         /////////////////////////////////////////////
+        // Mips Register Transfer Instructions
+        /////////////////////////////////////////////
+        'MTHI': {
+            runMethod: function(namedArgs) {
+                ME.setRegisterVal('hi', ME.getRegisterVal(namedArgs.$rs));
+            }
+        },
+        'MTLO': {
+            runMethod: function(namedArgs) {
+                ME.setRegisterVal('lo', ME.getRegisterVal(namedArgs.$rs));
+            }
+        },
+        'MFHI': {
+            runMethod: function(namedArgs) {
+                ME.setRegisterVal(namedArgs.$rd, ME.getRegisterVal('hi'));
+            }
+        },
+        'MFLO': {
+            runMethod: function(namedArgs) {
+                ME.setRegisterVal(namedArgs.$rd, ME.getRegisterVal('lo'));
+            }
+        },
+        /////////////////////////////////////////////
         // Mips Memory Access Instructions
         /////////////////////////////////////////////
         'LW': {
@@ -415,6 +478,13 @@ function mipsInstructionExecutor(ME) {
         if (result.carryFlag)
             ME.onSetCarryFlag();
         return result.result;
+    }
+    function multiplication(value1, value2) {
+        var result = BigInt(value1)*BigInt(value2);
+        return {
+            hi: Number(result>>BigInt(32)),
+            lo: Number(result & BigInt(0xFFFFFFFF))
+        };
     }
 
     return instructions;
