@@ -17,7 +17,7 @@ function mipsSyscalls(ME) {
 		for (var i = 0; i <= maxCharCount; i++) {
 			// null terminate the rest of the addresses
 			var byte = (i < input.length) ? input.charCodeAt(i) : 0;
-			ME.stack.setByte(stackSaveAddress + i, byte);
+			ME.stack.setByteAtAddress(stackSaveAddress + i, byte);
 		}
 
 		return input;
@@ -47,7 +47,7 @@ function mipsSyscalls(ME) {
 					break;
 				}
 
-				var byte =  ME.stack.getByte(address);
+				var byte =  ME.stack.getByteAtAddress(address);
 				if (stopOnceNullReached && byte === 0) {
 					break;
 				}
@@ -97,6 +97,14 @@ function mipsSyscalls(ME) {
 				var input = getInputStringAndSaveToStack('Enter a string (max length is {0} char(s))'.format(maxCharCount), maxCharCount, addressOfInputBuffer);
 
 				ME.setRegisterVal('$v0', input.length);
+			}
+		},
+		'9': {
+			description: 'Allocate Heap Memory',
+			execute: function() {
+				var bytesToAllocate = ME.getRegisterUnsignedVal('$a0');
+				var memoryStart = ME.heap.adjustSize(bytesToAllocate);
+				ME.setRegisterVal('$v0', memoryStart);
 			}
 		},
 		'50': {
@@ -188,7 +196,7 @@ function mipsSyscalls(ME) {
 				var stackPointer = ME.getRegisterUnsignedVal('$a0');
 				var string = MSYS.getStringAtAddress(stackPointer);
 				var number = ME.getRegisterUnsignedVal('$a1');
-				ME.alert(string + number);
+				ME.mipsAlert(string + number);
 			}
 		},
 		'59': {
@@ -199,7 +207,7 @@ function mipsSyscalls(ME) {
 				stackPointer = ME.getRegisterUnsignedVal('$a1');
 				var string2 = MSYS.getStringAtAddress(stackPointer);
 
-				ME.alert(string1 + string2);
+				ME.mipsAlert(string1 + string2);
 			}
 		},
 		'60': {

@@ -1,4 +1,4 @@
-var stack = new Stack();
+var stack = new BigEndianAccess(new Stack());
 var stackPointer = stack.pointerToBottomOfStack();
 
 module("Stack", {
@@ -80,9 +80,9 @@ test("Save/load integers to stack", function() {
 	equal(stack.getUnsignedByte(stackPointer + 3), 128, " 00000000  00000000  00000000 [10000000]");
 
 	stackPointer -= 1;
-	throws(function() { stack.setByte(stackPointer, -129); }, StackError, "Out of range.");
-	throws(function() { stack.setByte(stackPointer, 257); }, StackError, "Out of range.");
-	throws(function() { stack.setByte(stackPointer, Math.pow(2, 32)); }, StackError, "Out of range.");
+	throws(function() { stack.setByte(stackPointer, -129); }, MemoryError, "Out of range.");
+	throws(function() { stack.setByte(stackPointer, 257); }, MemoryError, "Out of range.");
+	throws(function() { stack.setByte(stackPointer, Math.pow(2, 32)); }, MemoryError, "Out of range.");
 	stack.setByte(stackPointer, -128);
 	stack.setByte(stackPointer, 0);
 	stack.setByte(stackPointer, 127);
@@ -116,13 +116,52 @@ test("Addresses", function() {
 	var stack = new Stack({baseAddress: 100});
 	stackPointer = stack.pointerToBottomOfStack();
 
-	throws(function() { stack.getByte(stackPointer); }, StackError, "Accessing the top of the stack should throw an error.");
-	stack.getByte(0); // "Accessing address 0 is valid.";
-	throws(function() { stack.getByte(-1); }, StackError, "Accessing anything below 0 is invalid.");
-	throws(function() { stack.getByte(stackPointer + 20); }, StackError, "Accessing anything above the top of the stack should throw an error.");
+	throws(function() { stack.getByteAtAddress(stackPointer); }, MemoryError, "Accessing the top of the stack should throw an error.");
+	stack.getByteAtAddress(0); // "Accessing address 0 is valid.";
+	throws(function() { stack.getByteAtAddress(-1); }, MemoryError, "Accessing anything below 0 is invalid.");
+	throws(function() { stack.getByteAtAddress(stackPointer + 20); }, MemoryError, "Accessing anything above the top of the stack should throw an error.");
 
 	stackPointer -= 1;
 	equal(stackPointer, 99, "99 should be the first accessible address.");
-	stack.setByte(stackPointer, 123);
-	equal(stack.getByte(stackPointer), 123);
+	stack.setByteAtAddress(stackPointer, 123);
+	equal(stack.getByteAtAddress(stackPointer), 123);
+});
+
+test("Heap", function() {
+	var heap = new Heap({baseAddress: 100});
+	equal(heap.size, 0, "Heap should be empty at the beginning");
+	throws(function() { heap.getByteAtAddress(heap.getMaxValidAddress())}, MemoryError, "Accessing the top of the heap should throw an error.");
+	throws(function() { heap.getByteAtAddress(heap.getMinValidAddress()-1)}, MemoryError, "Accessing anything below the start of the heap should throw an error.");
+	heap.adjustSize(4);
+	equal(heap.size, 4);
+	heap.setByteAtAddress(heap.getBaseAddress(), 102);
+	equal(heap.getByteAtAddress(heap.getBaseAddress()), 102);
+	throws(function() { heap.getByteAtAddress(heap.getBaseAddress()+4)}, MemoryError, "Accessing the top of the heap should throw an error.");
+	heap.adjustSize(4);
+	equal(heap.size, 8);
+	heap.setByteAtAddress(heap.getBaseAddress()+4, 103);
+	equal(heap.getByteAtAddress(heap.getBaseAddress()), 102);
+	equal(heap.getByteAtAddress(heap.getBaseAddress()+4), 103);
+	heap.adjustSize(-4);
+	equal(heap.size, 4);
+});
+
+test("Combined Memory", function() {
+	var heap1 = new Heap({baseAddress: 100});
+	var heap2 = new Heap({baseAddress: 200});
+	var memory = new CombinedMemory([heap1, heap2]);
+	heap1.adjustSize(16);
+	heap2.adjustSize(16);
+	throws(function() { memory.getByteAtAddress(216); } , MemoryError, "No memory should be available at this address");
+	memory.setByteAtAddress(100, 10);
+	equal(heap1.getByteAtAddress(100), 10);
+	memory.setByteAtAddress(100, 20);
+	equal(heap1.getByteAtAddress(100), 20);
+	memory.setByteAtAddress(200, 30);
+	equal(heap1.getByteAtAddress(100), 20);
+	equal(heap2.getByteAtAddress(200), 30);
+	memory.setByteAtAddress(200, 40);
+	equal(heap1.getByteAtAddress(100), 20);
+	equal(heap2.getByteAtAddress(200), 40);
+	memory.reset();
 });

@@ -5,6 +5,18 @@ test("Lexer", function() {
         let lexer = new Parser.Lexer(text);
         return lexer.next();
     };
+
+    let parseAllTokens = function(text) {
+        let lexer = new Parser.Lexer(text);
+        let tokens = [];
+        while (!lexer.endOfString()) {
+            tokens.push(lexer.next());
+        }
+        return {
+            lexer: lexer,
+            tokens: tokens
+        };
+    }
     
     let token;
 
@@ -40,6 +52,53 @@ test("Lexer", function() {
 
     token = parseSingleToken('>>>');
     equal(token.type, Parser.TokenType.LogicalShiftRight);
+
+    let result = parseAllTokens('   $a0 #bcd \n   $b0');
+    equal(result.tokens[0].type, Parser.TokenType.Register);
+    equal(result.tokens[1].type, Parser.TokenType.EndOfLine);
+    equal(result.tokens[2].type, Parser.TokenType.Register);
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[0].begin),
+        {
+            lineno: 1,
+            column: 3
+        }
+    );
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[0].end),
+        {
+            lineno: 1,
+            column: 6
+        }
+    );
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[1].begin),
+        {
+            lineno: 1,
+            column: 12
+        }
+    );
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[1].end),
+        {
+            lineno: 2,
+            column: 0
+        }
+    );
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[2].begin),
+        {
+            lineno: 2,
+            column: 3
+        }
+    );
+    deepEqual(
+        result.lexer.getLineInfoForIndex(result.tokens[2].end),
+        {
+            lineno: 2,
+            column: 6
+        }
+    );
 });
 
 
@@ -159,14 +218,18 @@ test('Operand Parser', function() {
 test('Instruction Parsing', function() {
     function parseLine(line, symbols) {
         let instructionParser = Parser.instructionParserFromString(line, symbols);
-        let lineInfo = instructionParser.parseLine();
+        let result = instructionParser.parseLine();
         instructionParser.tokenStream.enforceCompletion()
-        return lineInfo;
+        return {
+            instr: result,
+            labels: instructionParser.labels,
+            symbols: instructionParser.symbols
+        };
     }
     function isValidLine(line, symbols) {
         try {
-            parseLine(line, symbols);
-            return true;
+            let result = parseLine(line, symbols);
+            return (result.instr.error == null);
         } catch (e) {
             if (e instanceof Parser.Error) {
                 return false;
@@ -214,27 +277,37 @@ test('Instruction Parsing', function() {
 	ok(isValidLine("mylabel:ADD $t0, $t1, $t2"), "we can have attached labels.");
 
     deepEqual(parseLine('ADDIU $t0, $t0, lo16(0x1234)'),
-        {labels: [],
+        {labels: {},
+         symbols: {},
          instr: {
-            mnemonic: 'ADDIU',
+            instruction: 'ADDIU',
             args: {
                 '$rs': '$t0',
                 '$rt': '$t0',
                 'imm': 0x1234
-            }
+            },
+            error: null,
+            ignore: false
          }
         }
     );
 
     deepEqual(parseLine('L1: L2: LUI $t0, hi16(0x12345678)'),
-        {labels: ['L1', 'L2'],
-         instr: {
-            mnemonic: 'LUI',
-            args: {
-                '$rd': '$t0',
-                'imm': 0x1234
+        {
+            labels: {
+                'L1': 1,
+                'L2': 1
+            },
+            symbols: {},
+            instr: {
+                instruction: 'LUI',
+                args: {
+                    '$rd': '$t0',
+                    'imm': 0x1234
+                },
+                error: null,
+                ignore: false
             }
-         }
         }
     );
 
@@ -243,12 +316,14 @@ test('Instruction Parsing', function() {
 
     deepEqual(parseLine('c = (5+5)*2'),
         {
-            symbols: [
-                {
-                    name: 'c',
-                    value: 20
-                }
-            ]
+            symbols: {
+                'c': 20
+            },
+            labels: {},
+            instr: {
+                ignore: true,
+                error: null
+            }
         }
     );
 

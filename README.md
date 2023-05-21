@@ -25,7 +25,7 @@ There are 2 ways to process your code: Stepping, and Running.
   The last line the emulator successfully ran will be highlighted in green.
   The next line to be run will be highlighted in grey.
   If the emulator runs into a MIPS error, it will be highlighted in red.
-  You will notice as you step through your program that the last register, or stack address changed, is also highlighted in green.
+  You will notice as you step through your program that the last register, or stack or heap address changed, is also highlighted in green.
   See the Auto Switch feature for more details.
 * The second way to process your code is to "run" it.
   This can be accomplished by clicking the run button.
@@ -104,11 +104,11 @@ Tap a demo (e.g. Hello World) to replace the existing MIPS code with the predefi
 Then press run (or step) to watch it execute.
 Most of them are self explanatory, or have comments that explain how they work.
 
-#### Auto switch register/stack/log tabs
+#### Auto switch register/stack/heap/log tabs
 
-![Auto switch register/stack/log tabs](images/image07.png)
+![Auto switch register/stack/heap/log tabs](images/image07.png)
 
-With this feature enabled, whenever a register (or stack) is modified, the tab will automatically switch the corresponding tab so that you can see the relevant change.
+With this feature enabled, whenever a register (or heap/stack) is modified, the tab will automatically switch the corresponding tab so that you can see the relevant change.
 In the case where multiple things are modified at once, the last change will take precedence.
 
 
@@ -121,10 +121,10 @@ To change that, use the emulation options below the text editor.
 
 Note that when pipeline emulation is activated, branch and jump instructions will be delayed by one instruction slot, and the instruction immediately following them will be executed before the first instruction at the target location.
 
-#### Show stack byte as number/ascii/binary
+#### Show stack/heap byte as number/ascii/binary
 
-Sometimes it is useful to see the actual bits that compose a byte, or to see the corresponding ASCII character that is stored in the stack.
-You can toggle between seeing any of these three values for a corresponding address in the stack.
+Sometimes it is useful to see the actual bits that compose a byte, or to see the corresponding ASCII character that is stored in the stack/heap.
+You can toggle between seeing any of these three values for a corresponding address in the stack/heap.
 
 #### View registers
 
@@ -174,6 +174,7 @@ The syscalls supported are similar to the [syscalls used by the MARS emulator](h
 | Print String              | 4        | $a0 = stack address of null-terminated string to print to console                                                                                                             |                                                                                                                                                                                                                                                                                                                                                                    |
 | Read Integer              | 5        |                                                                                                                                                                               | $v0 = contains integer read                                                                                                                                                                                                                                                                                                                                        |
 | Read String               | 8        | $a0 = address of input buffer<br/>$a1 = maximum number of characters to read (this will be one less than the<br/>allowed string since it needs space for the null terminator) | $v0 = contains the length of the input string                                                                                                                                                                                                                                                                                                                      |
+| Allocate Heap Memory      | 9        | $a0 = number of bytes to allocate                                                                        | $v0 = contains address of allocated memory                                                                                                                                                                                                                                                                                                                      |
 | Confirm Dialog            | 50       | $a0 = address of null-terminated string that is the message to user                                                                                                           | $a0 contains value of user-chosen option<br/>0: OK<br/>1: Cancel                                                                                                                                                                                                                                                                                                   |
 | Input Dialog Int          | 51       | $a0 = address of null-terminated string that is the message to user                                                                                                           | $a0 contains int read<br/>$a1 contains status value<br/>0: OK status<br/>-1: input data cannot be correctly parsed<br/>-2: Cancel was chosen<br/>-3: OK was chosen but no data had been input into field                                                                                                                                                           |
 | Input Dialog String       | 54       | $a0 = address of null-terminated string that is the message to user<br/>$a1 = address of input buffer<br/>$a2 = maximum number of characters to read                          | $a1 contains status value<br/>0: OK status. Buffer contains the input string.<br/>-2: Cancel was chosen. No change to buffer.<br/>-3: OK was chosen but no data had been input into field. No change to buffer.<br/>-4: length of the input string exceeded the specified maximum. Buffer<br/>contains the maximum allowable input string plus a terminating null. |
@@ -188,7 +189,7 @@ The syscalls supported are similar to the [syscalls used by the MARS emulator](h
 
 ### Stack
 
-The stack is byte-addressable, and is currently the only place to store anything of great length.
+The stack is byte-addressable.
 Each time you start the emulator, the frame pointer will be initialized to a random address less than 2<sup>32</sup>, in order to simulate the fact that when you first run your program, the frame pointer may be at any given value.
 
 ![Black Arrow](images/image01.png)
@@ -205,6 +206,13 @@ You can change a value in the stack by clicking it to edit it.
 You can also view it in several modes, as an integer, in binary, and it’s ascii representation (‘None’ if no ascii character is available).
 Viewing the stack in a different mode doesn’t mean you can’t edit it.
 You can edit it in binary mode to save a binary representation, as you could with integers and ascii.
+
+### Heap
+
+The heap is byte-addressable.
+It can be extended using the syscall 9 (see the table above).
+
+Contents of the heap can be changed as for the stack, and representation (decimal/ascii/binary) can be changed as well.
 
 ## Developer Notes
 

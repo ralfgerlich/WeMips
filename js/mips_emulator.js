@@ -41,6 +41,15 @@ function MipsEmulator(mipsArgs){
         onStackChange: function(){
 
         },
+        onStackAdd: function() {
+
+        },
+        onHeapChange: function(){
+
+        },
+        onHeapAdjustSize: function(){
+
+        },
         onOutput: function(message) {
             console.log(message)
         },
@@ -53,14 +62,26 @@ function MipsEmulator(mipsArgs){
         onAlert: function(message) {
             assert(false, "Expecting alert to be displayed, but there is no handler.");
         },
-        baseStackAddress: undefined
+        baseStackAddress: undefined,
+        baseHeapAddress: undefined
     });
     var debug = mipsArgs.debug;
     //////////////////////////////////
     // Private Variables / Setup
     //////////////////////////////////
 
-   var stack = new Stack({onChange: mipsArgs.onStackChange, baseAddress: mipsArgs.baseStackAddress});
+   var stack = new Stack({
+        onChange: mipsArgs.onStackChange,
+        baseAddress: mipsArgs.baseStackAddress
+   });
+   var heap = new Heap({
+        onChange: mipsArgs.onHeapChange,
+        onAdjustSize: mipsArgs.onHeapAdjustSize,
+        baseAddress: mipsArgs.baseHeapAddress
+   });
+   var memory = new BigEndianAccess(
+    new CombinedMemory([heap, stack])
+   );
 
     /**
      * Hash table of registers
@@ -196,6 +217,8 @@ function MipsEmulator(mipsArgs){
     this.BITS_PER_REGISTER = 32,
     this.running = false,
     this.stack = stack,
+    this.heap = heap,
+    this.memory = memory;
     /**
      * Returns a specified registers value
      * @member mipsEmulator
@@ -319,7 +342,17 @@ function MipsEmulator(mipsArgs){
      * @return {Boolean}
      */
     this.isValidLine = function(line){
-        return !(new mipsLine(line).error);
+        let instructionParser = Parser.instructionParserFromString(line);
+        try {
+            let instruction = instructionParser.parseLine();
+            return instruction.error == null;
+        } catch (e) {
+            if (e instanceof Parser.Error) {
+                return false;
+            } else {
+                throw e;
+            }
+        }
     },
     /**
      * Resets mips labes, code, and stack
@@ -330,7 +363,7 @@ function MipsEmulator(mipsArgs){
         mipsCode.labels = {};
         mipsCode.code = [null];
         mipsCode.symbols = {};
-        stack.reset();
+        memory.reset();
         registers.$sp.val = stack.pointerToBottomOfStack();
     },
     /**
@@ -350,12 +383,13 @@ function MipsEmulator(mipsArgs){
         ME.reset();
         if(debug) console.log("Analyzing...");
 
-        $.each(mc.split('\n'), function(index, val){
-            var line = new mipsLine(val, mipsCode.code.length);
-            line.lineNo = mipsCode.code.length; // save the line number
-            // if(debug) console.log(JSON.stringify(line));
-            mipsCode.code.push(line);
-        });
+        let instructionParser = Parser.instructionParserFromString(mc);
+        instructionParser.parseCode();
+        mipsCode = {
+            code: instructionParser.code,
+            symbols: instructionParser.symbols,
+            labels: instructionParser.labels
+        };
         // Reset to first active line, as the code changed
         this.setNextLineToFetch(1);
     },
@@ -366,7 +400,8 @@ function MipsEmulator(mipsArgs){
      * @return {null}
      */
     this.runLine = function(inputLine) {
-        var line = new mipsLine(inputLine);
+        let instructionParser = Parser.instructionParserFromString(inputLine);
+        let line = instructionParser.parseLine();
         // This refers to the private method, private method should probably be renamed.
         runLine(line);
     },
@@ -460,7 +495,7 @@ function MipsEmulator(mipsArgs){
         var line = mipsCode.labels[label];
         if(debug) console.log("Getting label: "+ label + " - " +JSON.stringify(line) );
         if(line){
-            return this.goToLine(line.lineNo);
+            return this.goToLine(line);
         } else {
             throw new JumpError('Unknown label: {0}'.format(label));
         }
@@ -545,7 +580,7 @@ function MipsEmulator(mipsArgs){
      * @return {null}
      */
     function runLine(line) {
-        if(debug) console.log("running line: " + line.lineNo);
+        if(debug) console.log("running line: " + JSON.stringify(line));
         if (line.error) {
             throw new MipsError('Error on line: {0}'.format(line.error));
             // TODO: get rid of the other error handler
@@ -622,78 +657,6 @@ function MipsEmulator(mipsArgs){
         if(debug) console.error("--->" + message);
         lineNo = lineNo || currentLine;
         mipsArgs.onError(message, lineNo);
-    }
-
-    /**
-     * Turns a string into a mips line object which contains a mips line of code and metadata needed to run it
-     * @member mipsEmulator
-     * @private
-     * @param  {String} line
-     * @return {Object}
-     */
-    function mipsLine(line, lineNo){
-        lineNo = lineNo || null
-
-        // Object that will save information about a line of code.
-        /**
-         * @class line
-         * Contains information about a single line of mips code
-         * @member mipsEmulator
-         * @private
-         */
-        var LINE = {
-            /**
-             * Arguments for this line of code ex: [$t0, $s0, $zero]
-             * @property {array}
-             */
-            args: [],
-            /**
-             * The lines instruction ex: ADD
-             * @type {String}
-             */
-            instruction: null,
-            /**
-             * flag to indicate weather this line should be ignored (not run).
-             * @type {Boolean}
-             */
-            ignore: true,
-            /**
-             * Error when running this line of code (if any)
-             * @type {String}
-             */
-            error: null,
-            lineNo: lineNo,
-            text: line
-        };
-
-        let instructionParser = Parser.instructionParserFromString(line, mipsCode.symbols);
-        try {
-            let instruction = instructionParser.parseLine();
-            if (instruction.symbols) {
-                for (symbol of instruction.symbols) {
-                    mipsCode.symbols[symbol.name] = symbol.value;
-                }
-            }
-            if (instruction.labels) {
-                for (label of instruction.labels) {
-                    mipsCode.labels[label] = LINE;
-                }
-            }
-            if (instruction.instr) {
-                LINE.ignore = false;
-                LINE.instruction = instruction.instr.mnemonic;
-                LINE.args = instruction.instr.args;
-            }
-        } catch (e) {
-            if (e instanceof Parser.Error) {
-                /* Do not ignore erroneous lines! */
-                LINE.ignore = false;
-                LINE.error = e;
-            }
-        }
-        if(debug) console.log("Finished parsing line: " + JSON.stringify(LINE));
-
-        return LINE;
     }
 
     // Set the starting code if there was any.

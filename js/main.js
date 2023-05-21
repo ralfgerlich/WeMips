@@ -15,7 +15,7 @@ $(document).ready(function(){
     // Mips Emulator Setup
     ///////////////////////////////////////////////////
 
-    var me = MipsEmulator({
+    var me = new MipsEmulator({
         debug: false,
         /*
          * Changes the registers visual representation when the mips emulator changes its value
@@ -72,6 +72,8 @@ $(document).ready(function(){
             window.alert(message);
         },
         onStackChange: onStackChange,
+        onHeapChange: onHeapChange,
+        onHeapAdjustSize: onHeapAdjustSize,
         // Set the starting code to be the defualt in the editor.
         startingCode: $("#editor").val()
     });
@@ -130,6 +132,7 @@ $(document).ready(function(){
     $("#pipelineSwitch").change(function(e){me.setPipelineEmulationEnabled($(e.target).is(':checked'));});
     $("#clearLog").on('click', function(){$("#log").html('')});
     $("#stackDisplayType").change(changeStackType);
+    $("#heapDisplayType").change(changeHeapType);
     //$(".stackVal").on('blur', manualStackEdit); This has to be setup after the stack has been created
 
     // Functions to respond to events.
@@ -158,7 +161,7 @@ $(document).ready(function(){
         // if this code is no longer valid, reanalyze.
         if(!me.valid){
             try{
-                  mipsAnalyze();
+                mipsAnalyze();
             } catch(e){
                 addToLog('error', e.message, 1);
             }
@@ -175,8 +178,6 @@ $(document).ready(function(){
         } catch(e){
             addToLog('error', e.message, lastLineAttempted);
             running = false;
-            //me.setNextLineToFetch(lastLineAttempted + 1);
-            //setHighlights();
         }
 
     };
@@ -288,7 +289,7 @@ $(document).ready(function(){
         while (address < stackLow) {
             stackLow--;
             var bgColorClass = '';
-            var addressVal = me.stack.getByte(stackLow);
+            var addressVal = me.stack.getByteAtAddress(stackLow);
             var valRep = changeToStackRep(addressVal);
             if (colorizeAddrBG) bgColorClass = 'lightGreyBG';
             colorizeAddrBG = !colorizeAddrBG;
@@ -296,14 +297,14 @@ $(document).ready(function(){
                 "<div id='stackEntry-" + stackLow + "' >"
                 + "<span class='glyphicon'></span>&nbsp"
                 + "<span class='" + bgColorClass + "'>"
-                + "<span class='stackAddrReal stackAddr' " + showAddReal + " id='stackAddr-" + stackLow + "'>"
+                + "<span class='memAddrReal memAddr' " + showAddReal + " id='memAddr-" + stackLow + "'>"
                 + stackLow + ": "
                 + "</span>"
-                + "<span class='stackAddrRelative stackAddr' " + showAddRelative + " id='stackAddrRelative-" + stackLow + "'>"
+                + "<span class='memAddrRelative memAddr' " + showAddRelative + " id='memAddrRelative-" + stackLow + "'>"
                 + (stackLow - stackEnd) + ": "
                 + "</span>"
                 + "<span "
-                + "class='stackVal stackSpacer' "
+                + "class='stackVal memSpacer' "
                 + "id='stackVal-" + stackLow + "' "
                 + "address='" + stackLow + "' "
                 + "contenteditable='true' "
@@ -313,34 +314,72 @@ $(document).ready(function(){
                 + ">"
                 + valRep
                 + "</span>"
-                // + "<span class='regSpacer charBin' id='stackChar-"+stackLow+"'>"
-                //     + asChar(me.stack.getByte(stackLow))
-                // +"</span>"
-                // + "<span class='regSpacer charBin' id='stackBin-"+stackLow+"' style='display: none'>"
-                //     + asBin(me.stack.getByte(stackLow))
-                // +"</span>"
                 + "</span>"
                 + "</div>"
             );
             $("#stackVal-" + stackLow).on('blur', manualStackEdit);
         }
     }
-    function onStackChange(address, val, visualize) {
+    function onStackChange(address, val) {
         extendStack(address);
-        if (!val || val == '') val = me.stack.getByte(address);
-        if (typeof visualize == 'undefined')
-            visualize = true;
+        if (!val || val == '') val = me.stack.getByteAtAddress(address);
 
         $("#stackVal-" + address).html(changeToStackRep(val));
         $("#stackVal-" + address).attr('binary', asBin(val));
         $("#stackVal-" + address).attr('integer', val);
         $("#stackVal-" + address).attr('ascii', asChar(val));
 
+        if (autoSwitch) $('#registers a[href="#stack-container-div"]').tab('show');
+        $(".lastRegChanged").removeClass('lastRegChanged');
+        $("#stackVal-" + address).addClass('lastRegChanged');
+    }
+    function onHeapChange(address, val) {
+        extendHeap(address);
+        if (!val || val == '') val = me.heap.getByteAtAddress(address);
 
-        if (visualize) {
-            if (autoSwitch) $('#registers a[href="#stack-container-div"]').tab('show');
-            $(".lastRegChanged").removeClass('lastRegChanged');
-            $("#stackVal-" + address).addClass('lastRegChanged');
+        $("#heapVal-" + address).html(changeToHeapRep(val));
+        $("#heapVal-" + address).attr('binary', asBin(val));
+        $("#heapVal-" + address).attr('integer', val);
+        $("#heapVal-" + address).attr('ascii', asChar(val));
+
+        if (autoSwitch) $('#registers a[href="#heap-container-div"]').tab('show');
+        $(".lastRegChanged").removeClass('lastRegChanged');
+        $("#heapVal-" + address).addClass('lastRegChanged');
+    }
+    function onHeapAdjustSize() {
+        extendHeap(me.heap.getMaxValidAddress());
+    }
+    var heapDisplayMode = "integer";
+    function extendHeap(address) {
+        while (heapHigh < address) {
+            heapHigh++;
+            var bgColorClass = '';
+            var addressVal = me.heap.getByteAtAddress(heapHigh);
+            var valRep = changeToHeapRep(addressVal);
+            if (colorizeAddrBG) bgColorClass = 'lightGreyBG';
+            colorizeAddrBG = !colorizeAddrBG;
+            $("#heapRep").append(
+                "<div id='heapEntry-" + heapHigh + "' >"
+                + "<span class='glyphicon'></span>&nbsp"
+                + "<span class='" + bgColorClass + "'>"
+                + "<span class='memAddrReal heapAddr' id='heapAddr-" + heapHigh + "'>"
+                + heapHigh + ": "
+                + "</span>"
+                + "<span "
+                + "class='heapVal memSpacer' "
+                + "id='heapVal-" + heapHigh + "' "
+                + "address='" + heapHigh + "' "
+                + "contenteditable='true' "
+                + "integer='" + addressVal + "' "
+                + "ascii='" + asChar(addressVal) + "' "
+                + "binary='" + asBin(addressVal) + "' "
+                + ">"
+                + valRep
+                + "</span>"
+                + "</span>"
+                + "</div>"
+            );
+            $("#heapVal-" + stackLow).on('blur', manualHeapEdit);
         }
     }
     var stackEnd = me.stack.pointerToBottomOfStack();
@@ -349,6 +388,7 @@ $(document).ready(function(){
         "<div id='stackEntry-" + stackLow + "' >"
         + "<span class='glyphicon'></span>&nbsp"
         + "</div>");
+    var heapHigh = me.heap.getBaseAddress();
 
     
     function changeStackType(e){
@@ -361,6 +401,28 @@ $(document).ready(function(){
     function changeToStackRep(v){
         //console.log(stackDisplayMode);
         switch(stackDisplayMode) {
+            case "integer":
+                return v;
+                break;
+            case "ascii":
+                return asChar(v);
+                break;
+            case "binary":
+                return asBin(v);
+                break;
+        }
+    }
+    
+    function changeHeapType(e){
+        heapDisplayMode = $("#heapDisplayType option:selected").html().toLowerCase();
+        $(".heapVal").each(function(){
+             console.log(heapDisplayMode + " - " + $(this).attr(heapDisplayMode));
+             $(this).html($(this).attr(heapDisplayMode));
+         });
+     }; 
+     function changeToHeapRep(v){
+        //console.log(heapDisplayMode);
+        switch(heapDisplayMode) {
             case "integer":
                 return v;
                 break;
@@ -386,9 +448,24 @@ $(document).ready(function(){
                 break;
         }
         if(typeof newVal != "Number") newVal = Number(newVal);
-        me.stack.setByte(address, newVal);
+        me.stack.setByteAtAddress(address, newVal);
     };
-    //setSP(stackEnd);
+    function manualHeapEdit(e){
+        var address = parseInt($(e.target).attr('address'));
+        var newVal = $(e.target).html();
+        switch(heapDisplayMode) {
+            case "integer":
+                break;
+            case "ascii":
+                newVal = newVal.charCodeAt(0);
+                break;
+            case "binary":
+                newVal = Number(parseInt(newVal, 2));
+                break;
+        }
+        if(typeof newVal != "Number") newVal = Number(newVal);
+        me.heap.setByteAtAddress(address, newVal);
+    };
     function setupTests(){
         // <div id='additionDoubler'></div>
         // <button type="button" load="#additionDoubler" class="btn btn-default">Addition Doubler</button>
@@ -413,11 +490,11 @@ $(document).ready(function(){
     function switchAddressMode(e){
         showRelative = $(e.target).is(':checked');
         if(showRelative){
-            $('.stackAddrRelative').show();
-            $('.stackAddrReal').hide();
+            $('.memAddrRelative').show();
+            $('.memAddrReal').hide();
         } else {
-            $('.stackAddrRelative').hide();
-            $('.stackAddrReal').show();
+            $('.memAddrRelative').hide();
+            $('.memAddrReal').show();
         }
     }
     function asChar(num){
