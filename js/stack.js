@@ -129,14 +129,21 @@ function Heap(options) {
         onAdjustSize: null
     })
     MemoryBase.call(this, options);
+    let parentReset = this.reset;
     this.size = options.initialSize;
 
     this.adjustSize = function(adjustAmount) {
         var oldEnd = this.getMaxValidAddress();
-        assert (this.size + adjustAmount >= 0);
-        this.size = this.size + adjustAmount;
-        if (options.onAdjustSize) options.onAdjustSize(this.size);
+        if (adjustAmount != 0) {
+            assert (this.size + adjustAmount >= 0);
+            this.size = this.size + adjustAmount;
+            if (options.onAdjustSize) options.onAdjustSize(this.size);
+        }
         return oldEnd;
+    }
+    this.reset = function() {
+        parentReset();
+        this.size = options.initialSize;
     }
 }
 Object.setPrototypeOf(Heap.prototype, MemoryBase.prototype);

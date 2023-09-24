@@ -14,7 +14,6 @@ function MipsError(message) {
 /**
  * Mips emulator constructor
  * @param  {Object} mipsArgs Arguments to construct the mips emulater.
- * @param mipsArgs.startingCode Set the default code for this emulator to run.
  * @param mipsArgs.debug If debug is set to true, the console will print debug statements
  * @return {mipsEmulator}
  * @member mipsEmulator
@@ -23,7 +22,6 @@ function MipsEmulator(mipsArgs){
     mipsArgs = mipsArgs || {};
     var ME = this;
     mipsArgs = _.defaults(mipsArgs, {
-        startingCode: null,
         debug: false,
         onError: function(message, lineNumber){
             alert(message);
@@ -336,35 +334,20 @@ function MipsEmulator(mipsArgs){
         return nextLineToFetch;
     },
     /**
-     * Checks if a string is a valid mips line
-     * @member mipsEmulator
-     * @param  {String}  line
-     * @return {Boolean}
-     */
-    this.isValidLine = function(line){
-        let instructionParser = Parser.instructionParserFromString(line);
-        try {
-            let instruction = instructionParser.parseLine();
-            return instruction.error == null;
-        } catch (e) {
-            if (e instanceof Parser.Error) {
-                return false;
-            } else {
-                throw e;
-            }
-        }
-    },
-    /**
-     * Resets mips labes, code, and stack
+     * Reset emulator
      * @member mipsEmulator
      * @return {null}
      */
     this.reset = function() {
-        mipsCode.labels = {};
-        mipsCode.code = [null];
-        mipsCode.symbols = {};
         memory.reset();
         registers.$sp.val = stack.pointerToBottomOfStack();
+        /* Restore the contents of the heap */
+        heap.adjustSize(mipsCode.data.length);
+        let addr = heap.getBaseAddress();
+        for (byte of mipsCode.data) {
+            heap.setByteAtAddress(addr, byte);
+            addr++;
+        }
     },
     /**
      * Set the debug option for the mips_emulator
@@ -380,18 +363,19 @@ function MipsEmulator(mipsArgs){
      * @param {String} mc
      */
     this.setCode = function(mc){
-        ME.reset();
         if(debug) console.log("Analyzing...");
 
         let instructionParser = Parser.instructionParserFromString(mc);
         instructionParser.parseCode();
         mipsCode = {
             code: instructionParser.code,
+            data: instructionParser.data,
             symbols: instructionParser.symbols,
             labels: instructionParser.labels
         };
         // Reset to first active line, as the code changed
         this.setNextLineToFetch(1);
+        this.reset();
     },
     /**
      * Run an individual line
@@ -658,8 +642,4 @@ function MipsEmulator(mipsArgs){
         lineNo = lineNo || currentLine;
         mipsArgs.onError(message, lineNo);
     }
-
-    // Set the starting code if there was any.
-    if(mipsArgs.startingCode) ME.setCode(mipsArgs.startingCode);
-    return this;
 }

@@ -44,7 +44,11 @@ Parser.ParseError = function(message, token) {
 }
 Parser.ParseError.prototype = Object.create( Parser.Error.prototype );
 Parser.ParseError.prototype.toString = function() {
-    return this.message+" ('"+this.token.value+"')";
+    if (this.token) {
+        return this.message+" ('"+this.token.value+"')";
+    } else {
+        return this.message;
+    }
 }
 
 /** Exception for unexpected tokens
@@ -94,3 +98,16 @@ Parser.UnknownSymbolError = function(token) {
         token);
 }
 Parser.UnknownSymbolError.prototype = Object.create( Parser.ParseError.prototype );
+
+/** Exception for unknown dirctives
+ * Thrown when the parser encounters an unknown directive.
+ * @constructor
+ * @param {Parser.Token} token   The relevant token that led to the exception
+ */
+Parser.UnknownDirectiveError = function(token) {
+    Parser.ParseError.call(
+        this,
+        'Unknown directive',
+        token);
+}
+Parser.UnknownDirectiveError.prototype = Object.create( Parser.ParseError.prototype );

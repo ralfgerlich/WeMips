@@ -1,4 +1,4 @@
-module('New Parser');
+module('Parser');
 
 test("Lexer", function() {
     let parseSingleToken = function(text) {
@@ -257,6 +257,7 @@ test('Instruction Parsing', function() {
 	ok(isValidLine("J label"));
 	ok(isValidLine("LW $s1, 16( $sp )"), "spaces allowed between parens");
 	ok(isValidLine("LUI $t0, hi16(0x12345678)"), "hi16 call allowed");
+	ok(!isValidLine('ADDIU $t0, $t0, $t0'), "Must have an immediate.");
 	ok(isValidLine("ADDIU $t0, $t0, lo16(0x12345678)"), "lo16 call allowed");
 	ok(!isValidLine("ADDIU $t0, $t0, lo16(0x12345678"), "missing paren leads to error");
 	ok(isValidLine("LW $t0, lo16(0x12345678)($t0)"), "proper parsing of parens for register-relative address");
@@ -333,4 +334,30 @@ test('Instruction Parsing', function() {
                     }),
                     "We can use symbols");
     ok(!isValidLine("ADDI $t0, $zero, lo16(c+5)"), "We cannot use undefined symbols");
+});
+
+test('Program Parsing', function() {
+    function parseProgram(programLines) {
+        let programText = programLines.join('\n');
+        let instructionParser = Parser.instructionParserFromString(programText);
+        instructionParser.parseCode();
+        return instructionParser;
+    }
+
+    let parser = parseProgram([
+        'ADDIU $t0, $zero, 15',
+        '.text',
+        'ADDU $t0, $t0, 25',
+        '.data',
+        '.word 0xdeadbeef, 0x12345678'
+    ]);
+    equal(parser.code.length, 6);
+    ok(!parser.code[1].ignore, "Instructions must not be ignored");
+    ok(parser.code[2].ignore, "Directives must be ignored lines");
+    ok(!parser.code[3].ignore, "Instructions must not be ignored");
+    ok(parser.code[4].ignore, "Directives must be ignored lines");
+    ok(parser.code[5].ignore, "Directives must be ignored lines");
+    deepEqual(parser.data, [
+        0xde, 0xad, 0xbe, 0xef, 0x12, 0x34, 0x56, 0x78
+    ]);
 });
